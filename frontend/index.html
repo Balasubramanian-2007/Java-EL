@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Question Paper Generator</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- Background grid -->
+  <div class="bg-grid"></div>
+
+  <div class="app-shell">
+
+    <!-- Sidebar / Step Nav -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">⬡</span>
+        <span class="brand-name">QPGen</span>
+      </div>
+      <nav class="step-nav">
+        <div class="step-item active" data-step="1">
+          <span class="step-dot"></span>
+          <span class="step-label">Subject</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item" data-step="2">
+          <span class="step-dot"></span>
+          <span class="step-label">Chapters</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item" data-step="3">
+          <span class="step-dot"></span>
+          <span class="step-label">Marks & Weightage</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item" data-step="4">
+          <span class="step-dot"></span>
+          <span class="step-label">Generated Paper</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <p>Spring Boot ready</p>
+        <span class="badge">v1.0</span>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+
+      <!-- STEP 1: Subject -->
+      <section class="step-section active" id="step-1">
+        <div class="step-header">
+          <p class="step-eyebrow">Step 01</p>
+          <h1 class="step-title">Enter Subject</h1>
+          <p class="step-desc">Start by giving a name to your subject. This will appear on the question paper header.</p>
+        </div>
+        <div class="card">
+          <label class="field-label" for="subjectName">Subject Name</label>
+          <input type="text" id="subjectName" class="input-field" placeholder="e.g. Data Structures and Algorithms" />
+
+          <label class="field-label mt" for="chapterCount">Number of Chapters</label>
+          <input type="number" id="chapterCount" class="input-field" placeholder="e.g. 3" min="1" max="20" />
+
+          <button class="btn-primary" id="step1Next">Continue →</button>
+        </div>
+      </section>
+
+      <!-- STEP 2: Chapters & Questions -->
+      <section class="step-section" id="step-2">
+        <div class="step-header">
+          <p class="step-eyebrow">Step 02</p>
+          <h1 class="step-title">Add Chapters & Questions</h1>
+          <p class="step-desc">Fill in each chapter's name and add questions. Each question is either <strong>2-mark</strong> or <strong>8-mark</strong>.</p>
+        </div>
+        <div id="chaptersContainer"></div>
+        <div class="nav-row">
+          <button class="btn-ghost" id="step2Back">← Back</button>
+          <button class="btn-primary" id="step2Next">Continue →</button>
+        </div>
+      </section>
+
+      <!-- STEP 3: Marks & Weightage -->
+      <section class="step-section" id="step-3">
+        <div class="step-header">
+          <p class="step-eyebrow">Step 03</p>
+          <h1 class="step-title">Marks & Weightage</h1>
+          <p class="step-desc">Set the total marks for the paper and assign a percentage weightage to each chapter.</p>
+        </div>
+        <div class="card">
+          <label class="field-label" for="totalMarks">Total Marks</label>
+          <input type="number" id="totalMarks" class="input-field" placeholder="e.g. 100" min="1" />
+        </div>
+        <div id="weightageContainer"></div>
+        <div class="weightage-status" id="weightageStatus"></div>
+        <div class="nav-row">
+          <button class="btn-ghost" id="step3Back">← Back</button>
+          <button class="btn-primary" id="generateBtn">Generate Paper →</button>
+        </div>
+      </section>
+
+      <!-- STEP 4: Generated Paper -->
+      <section class="step-section" id="step-4">
+        <div class="step-header">
+          <p class="step-eyebrow">Step 04</p>
+          <h1 class="step-title">Generated Paper</h1>
+          <p class="step-desc">Your question paper is ready. Review it below and download as a text file.</p>
+        </div>
+        <div id="paperOutput"></div>
+        <div class="nav-row">
+          <button class="btn-ghost" id="step4Back">← Regenerate</button>
+          <button class="btn-primary" id="downloadBtn">⬇ Download .txt</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

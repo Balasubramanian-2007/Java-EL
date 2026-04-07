@@ -1,0 +1,15 @@
+============================================
+       QUESTION PAPER
+Subject : Data Structures
+Total Marks : 20
+Total Questions : 4
+============================================
+
+1. [8 Marks] Explain insertion in array.
+2. [8 Marks] Explain types of linked list.
+3. [2 Marks] What is node in linked list?
+4. [2 Marks]  Define linked list.
+
+============================================
+        END OF QUESTION PAPER
+============================================
