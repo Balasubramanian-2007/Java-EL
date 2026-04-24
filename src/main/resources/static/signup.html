@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign Up — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <h1> QPGen</h1>
+      <p>Create your account to get started.</p>
+
+      <div id="alertBox" class="alert"></div>
+
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" placeholder="e.g. Dr. Ravi Kumar" />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@college.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password (min 6 characters)</label>
+        <input type="password" id="password" placeholder="Choose a password" />
+      </div>
+
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role">
+          <option value="">— Select your role —</option>
+          <option value="staff">Staff (can submit questions for approval)</option>
+          <option value="coe">COE (can approve questions and generate papers)</option>
+        </select>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <button class="btn btn-primary" style="width:100%;" onclick="doSignup()">
+          Create Account →
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        Already have an account? <a href="/login.html">Login</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // If already logged in, go to dashboard
+    if (getUser()) window.location.href = '/index.html';
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+    }
+
+    async function doSignup() {
+      const name     = document.getElementById('name').value.trim();
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const role     = document.getElementById('role').value;
+
+      if (!name || !email || !password || !role) {
+        showAlert('⚠️ Please fill in all fields.', false);
+        return;
+      }
+
+      try {
+        const res  = await fetch(`${BASE_URL}/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, role })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          showAlert(' ' + data.message, true);
+          // Redirect to login after 2 seconds
+          setTimeout(() => window.location.href = '/login.html', 2000);
+        } else {
+          showAlert(' ' + data.error, false);
+        }
+      } catch (err) {
+        showAlert(' Could not connect. Is the server running?', false);
+      }
+    }
+  </script>
+</body>
+</html>

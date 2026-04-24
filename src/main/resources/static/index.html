@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav><!-- built by JS -->
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p id="welcomeMsg">Welcome back!</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-num" id="totalQuestions">—</div>
+        <div class="stat-label">Approved Questions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="totalSubjects">—</div>
+        <div class="stat-label">Subjects</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="shortCount">—</div>
+        <div class="stat-label">2-Mark Questions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="longCount">—</div>
+        <div class="stat-label">8-Mark Questions</div>
+      </div>
+    </div>
+
+    <!-- COE sees pending count as well -->
+    <div id="pendingBanner" style="display:none" class="info-banner warn">
+      ⏳ There are <strong id="pendingCount">—</strong> question(s) waiting for your approval.
+      <a href="/pending-approvals.html" style="color:var(--amber-dim);font-weight:700;margin-left:0.5rem;">Review Now →</a>
+    </div>
+
+    <!-- Staff: note that submitted questions need approval -->
+    <div id="staffBanner" style="display:none" class="info-banner">
+      ℹ️ Questions you add will be sent for COE approval before appearing in the question bank.
+      <a href="/my-questions.html" style="color:#2a4365;font-weight:700;margin-left:0.5rem;">View My Submissions →</a>
+    </div>
+
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <div class="quick-links" id="quickLinks">
+        <!-- populated by JS based on role -->
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Subjects in Bank</h2>
+      <div id="subjectsList" class="spinner show">Loading...</div>
+    </div>
+
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user) {
+      buildNav('dashboard');
+      document.getElementById('welcomeMsg').textContent =
+        `Welcome back, ${user.name}! You are logged in as ${user.role.toUpperCase()}.`;
+
+      // Show role-specific banners
+      if (user.role === 'staff') {
+        document.getElementById('staffBanner').style.display = 'block';
+      }
+
+      // Build quick links based on role
+      const links = [
+        { href: '/add-question.html',   icon: '', label: 'Add Question' },
+        { href: '/view-questions.html', icon: '', label: 'View Questions' },
+        { href: '/generate-paper.html', icon: '', label: 'Generate Paper' },
+      ];
+      if (user.role === 'coe') {
+        links.push({ href: '/pending-approvals.html', icon: '', label: 'Pending Approvals' });
+      } else {
+        links.push({ href: '/my-questions.html', icon: '', label: 'My Submissions' });
+      }
+      document.getElementById('quickLinks').innerHTML = links.map(l => `
+        <a href="${l.href}" class="quick-link">
+          <span class="ql-icon">${l.icon}</span>
+          <span>${l.label}</span>
+        </a>
+      `).join('');
+
+      loadDashboard();
+    }
+
+    async function loadDashboard() {
+      try {
+        const [qRes, sRes] = await Promise.all([
+          fetch(`${BASE_URL}/questions`),
+          fetch(`${BASE_URL}/questions/subjects`)
+        ]);
+        const questions = await qRes.json();
+        const subjects  = await sRes.json();
+
+        document.getElementById('totalQuestions').textContent = questions.length;
+        document.getElementById('totalSubjects').textContent  = subjects.length;
+        document.getElementById('shortCount').textContent = questions.filter(q => q.marks === 2).length;
+        document.getElementById('longCount').textContent  = questions.filter(q => q.marks === 8).length;
+
+        const container = document.getElementById('subjectsList');
+        container.classList.remove('spinner', 'show');
+        container.innerHTML = subjects.length
+          ? subjects.map(s => `<span class="badge badge-mcq" style="margin:4px">${s}</span>`).join('')
+          : '<p style="color:var(--gray-500)">No subjects yet. Add some questions!</p>';
+
+        // COE: check for pending questions
+        if (user.role === 'coe') {
+          const pRes     = await fetch(`${BASE_URL}/questions/pending`);
+          const pending  = await pRes.json();
+          if (pending.length > 0) {
+            document.getElementById('pendingCount').textContent = pending.length;
+            document.getElementById('pendingBanner').style.display = 'block';
+          }
+        }
+
+      } catch (err) {
+        document.getElementById('subjectsList').textContent =
+          '⚠️ Could not connect to server. Is Spring Boot running?';
+      }
+    }
+  </script>
+</body>
+</html>

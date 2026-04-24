@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Add Question — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav><!-- built by JS -->
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Add New Question</h1>
+      <p>Fill in the form below to add a question to the bank.</p>
+    </div>
+
+    <!-- Role notice: different message for staff vs COE -->
+    <div id="roleBanner" class="info-banner"></div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="card">
+      <h2>Question Details</h2>
+
+      <div class="form-grid">
+
+        <div class="form-group full">
+          <label for="questionText">Question Text *</label>
+          <textarea id="questionText" placeholder="Write the question here..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="subject">Subject *</label>
+          <input type="text" id="subject" placeholder="e.g. Mathematics"/>
+        </div>
+
+        <div class="form-group">
+          <label for="topic">Topic *</label>
+          <input type="text" id="topic" placeholder="e.g. Calculus"/>
+        </div>
+
+        <div class="form-group">
+          <label for="difficulty">Difficulty *</label>
+          <select id="difficulty">
+            <option value="">— Select —</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="marks">Marks *</label>
+          <select id="marks">
+            <option value="">— Select —</option>
+            <option value="2">2 Marks (Short)</option>
+            <option value="8">8 Marks (Long)</option>
+          </select>
+        </div>
+
+        <div class="form-group full">
+          <label for="type">Question Type *</label>
+          <select id="type" onchange="toggleMCQOptions()">
+            <option value="">— Select —</option>
+            <option value="MCQ">MCQ (Multiple Choice)</option>
+            <option value="Descriptive">Descriptive</option>
+          </select>
+        </div>
+
+        <div class="form-group full options-section" id="mcqSection">
+          <label>MCQ Options *</label>
+          <div class="options-grid">
+            <input type="text" id="optionA" placeholder="Option A"/>
+            <input type="text" id="optionB" placeholder="Option B"/>
+            <input type="text" id="optionC" placeholder="Option C"/>
+            <input type="text" id="optionD" placeholder="Option D"/>
+          </div>
+          <div style="margin-top:0.75rem">
+            <label for="correctOption">Correct Option</label>
+            <select id="correctOption" style="margin-top:0.4rem">
+              <option value="">— Select Correct —</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.5rem; display:flex; gap:1rem;">
+        <button class="btn btn-primary" onclick="submitQuestion()">➕ Add Question</button>
+        <button class="btn btn-outline" onclick="resetForm()">↺ Reset</button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user) {
+      buildNav('add');
+
+      // Show role notice
+      const banner = document.getElementById('roleBanner');
+      if (user.role === 'coe') {
+        banner.textContent = ' As COE, questions you add will be automatically approved.';
+      } else {
+        banner.className = 'info-banner warn';
+        banner.textContent = 'As Staff, questions you add will be sent to the COE for approval before appearing in the question bank.';
+      }
+    }
+
+    function toggleMCQOptions() {
+      const type = document.getElementById('type').value;
+      document.getElementById('mcqSection').classList.toggle('visible', type === 'MCQ');
+    }
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+      setTimeout(() => box.classList.remove('show'), 4000);
+    }
+
+    async function submitQuestion() {
+      if (!user) return;
+
+      const questionText = document.getElementById('questionText').value.trim();
+      const subject      = document.getElementById('subject').value.trim();
+      const topic        = document.getElementById('topic').value.trim();
+      const difficulty   = document.getElementById('difficulty').value;
+      const marks        = parseInt(document.getElementById('marks').value);
+      const type         = document.getElementById('type').value;
+
+      if (!questionText || !subject || !topic || !difficulty || !marks || !type) {
+        showAlert('⚠️ Please fill in all required fields.', false);
+        return;
+      }
+
+      const body = {
+        questionText, subject, topic, difficulty, marks, type,
+        optionA:       document.getElementById('optionA').value.trim() || null,
+        optionB:       document.getElementById('optionB').value.trim() || null,
+        optionC:       document.getElementById('optionC').value.trim() || null,
+        optionD:       document.getElementById('optionD').value.trim() || null,
+        correctOption: document.getElementById('correctOption').value || null
+      };
+
+      try {
+        // We pass userId and userRole as query params so the server knows who is submitting
+        const res = await fetch(`${BASE_URL}/questions?userId=${user.id}&userRole=${user.role}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const text = await res.text();
+
+        if (res.ok) {
+          showAlert(' ' + text, true);
+          resetForm();
+        } else {
+          showAlert(' ' + text, false);
+        }
+      } catch (err) {
+        showAlert(' Could not connect to server.', false);
+      }
+    }
+
+    function resetForm() {
+      ['questionText','subject','topic','optionA','optionB','optionC','optionD']
+        .forEach(id => document.getElementById(id).value = '');
+      ['difficulty','marks','type','correctOption']
+        .forEach(id => document.getElementById(id).value = '');
+      document.getElementById('mcqSection').classList.remove('visible');
+    }
+  </script>
+</body>
+</html>

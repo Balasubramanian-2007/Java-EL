@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Question Bank — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav>
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Question Bank</h1>
+      <p>All approved questions. Browse and manage the question bank.</p>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="card">
+
+      <div class="toolbar">
+        <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+          <label for="subjectFilter" style="text-transform:none;font-size:0.9rem;">Filter by Subject:</label>
+          <select id="subjectFilter" onchange="loadQuestions()" style="width:auto;min-width:180px">
+            <option value="">All Subjects</option>
+          </select>
+        </div>
+        <div id="questionCount" style="color:var(--gray-500);font-size:0.88rem;"></div>
+      </div>
+
+      <div id="spinner" class="spinner show">Loading questions...</div>
+
+      <div class="table-wrapper" id="tableWrapper" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Subject</th>
+              <th>Topic</th>
+              <th>Type</th>
+              <th>Marks</th>
+              <th>Difficulty</th>
+              <th>Added By</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="questionTableBody"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" style="display:none;text-align:center;padding:3rem;color:var(--gray-500)">
+        <div style="font-size:3rem">📭</div>
+        <p style="margin-top:0.75rem">No approved questions found. <a href="/add-question.html">Add some!</a></p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    let currentUser = null;
+
+    const user = requireLogin();
+    if (user) {
+      currentUser = user;
+      buildNav('view');
+      loadSubjects();
+      loadQuestions();
+    }
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+      setTimeout(() => box.classList.remove('show'), 4000);
+    }
+
+    async function loadSubjects() {
+      try {
+        const res = await fetch(`${BASE_URL}/questions/subjects`);
+        const subjects = await res.json();
+        const select = document.getElementById('subjectFilter');
+        subjects.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          select.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    async function loadQuestions() {
+      const subject = document.getElementById('subjectFilter').value;
+      const spinner = document.getElementById('spinner');
+      const tableWrapper = document.getElementById('tableWrapper');
+      const emptyState = document.getElementById('emptyState');
+      const tbody = document.getElementById('questionTableBody');
+
+      spinner.classList.add('show');
+      tableWrapper.style.display = 'none';
+      emptyState.style.display   = 'none';
+
+      try {
+        const url = subject
+          ? `${BASE_URL}/questions?subject=${encodeURIComponent(subject)}`
+          : `${BASE_URL}/questions`;
+        const res = await fetch(url);
+        const questions = await res.json();
+
+        spinner.classList.remove('show');
+        document.getElementById('questionCount').textContent = `${questions.length} question(s)`;
+
+        if (questions.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = questions.map((q, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td style="max-width:280px">
+              <div style="font-size:0.88rem;line-height:1.4">${escapeHtml(q.questionText)}</div>
+              ${q.type === 'MCQ' ? `
+                <div style="margin-top:0.35rem;font-size:0.76rem;color:var(--gray-500)">
+                  A: ${q.optionA || '—'} | B: ${q.optionB || '—'} |
+                  C: ${q.optionC || '—'} | D: ${q.optionD || '—'}
+                </div>` : ''}
+            </td>
+            <td>${escapeHtml(q.subject)}</td>
+            <td>${escapeHtml(q.topic)}</td>
+            <td><span class="badge ${q.type === 'MCQ' ? 'badge-mcq' : 'badge-desc'}">${q.type}</span></td>
+            <td><span class="badge ${q.marks === 2 ? 'badge-2mark' : 'badge-8mark'}">${q.marks}M</span></td>
+            <td><span class="badge badge-${q.difficulty}">${q.difficulty}</span></td>
+            <td style="font-size:0.82rem">${escapeHtml(q.addedByName || '—')}</td>
+            <td>
+              ${currentUser && currentUser.role === 'coe'
+                ? `<button class="btn btn-danger" onclick="deleteQuestion(${q.id})">🗑 Delete</button>`
+                : '<span style="color:var(--gray-500);font-size:0.8rem">—</span>'
+              }
+            </td>
+          </tr>
+        `).join('');
+
+        tableWrapper.style.display = 'block';
+
+      } catch (err) {
+        spinner.classList.remove('show');
+        showAlert(' Could not connect to server.', false);
+      }
+    }
+
+    async function deleteQuestion(id) {
+      if (!confirm('Delete this question?')) return;
+      try {
+        const res = await fetch(`${BASE_URL}/questions/${id}`, { method: 'DELETE' });
+        const text = await res.text();
+        if (res.ok) { showAlert(' ' + text, true); loadQuestions(); }
+        else showAlert(' ' + text, false);
+      } catch (e) {
+        showAlert(' Could not connect.', false);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '—';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

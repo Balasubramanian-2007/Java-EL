@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <h1> QPGen</h1>
+      <p>Sign in to your account to continue.</p>
+
+      <div id="alertBox" class="alert"></div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@college.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" />
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <button class="btn btn-primary" style="width:100%;" onclick="doLogin()">
+          Login →
+        </button>
+      </div>
+
+      <div class="auth-footer">
+        Don't have an account? <a href="/signup.html">Create one</a>
+      </div>
+
+      <!-- Quick hint for demo -->
+      <div style="margin-top:1.5rem;padding:0.75rem;background:var(--gray-100);border-radius:7px;font-size:0.8rem;color:var(--gray-500);">
+        <strong>Demo accounts:</strong><br/>
+        COE: coe@college.com / <code>coe123</code><br/>
+        Staff: staff@college.com / <code>staff123</code>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // If already logged in, go to dashboard
+    if (getUser()) window.location.href = '/index.html';
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+    }
+
+    async function doLogin() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showAlert('⚠️ Please enter your email and password.', false);
+        return;
+      }
+
+      try {
+        const res  = await fetch(`${BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          saveSession(data);        // Save user info to sessionStorage
+          window.location.href = '/index.html';
+        } else {
+          showAlert(' ' + data.error, false);
+        }
+      } catch (err) {
+        showAlert(' Could not connect. Is the server running?', false);
+      }
+    }
+
+    // Allow pressing Enter to login
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+  </script>
+</body>
+</html>

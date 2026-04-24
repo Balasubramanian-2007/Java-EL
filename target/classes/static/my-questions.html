@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Submissions — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav>
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>My Submissions</h1>
+      <p>Questions you have submitted and their approval status.</p>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="info-banner">
+      ℹ️ Questions with <strong>Pending</strong> status are waiting for COE review.
+      <strong>Approved</strong> questions appear in the question bank and can be used for paper generation.
+    </div>
+
+    <div class="card">
+
+      <div class="toolbar">
+        <span id="submissionCount" style="color:var(--gray-500);font-size:0.88rem;">Loading...</span>
+        <a href="/add-question.html" class="btn btn-primary" style="padding:0.5rem 1.2rem;font-size:0.88rem;">
+           Add New
+        </a>
+      </div>
+
+      <div id="spinner" class="spinner show">Loading your submissions...</div>
+
+      <div class="table-wrapper" id="tableWrapper" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Subject / Topic</th>
+              <th>Type</th>
+              <th>Marks</th>
+              <th>Difficulty</th>
+              <th>Status</th>
+              <th>Approved By</th>
+            </tr>
+          </thead>
+          <tbody id="myTableBody"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" style="display:none;text-align:center;padding:3rem;color:var(--gray-500)">
+        <div style="font-size:3rem"></div>
+        <p style="margin-top:0.75rem">You have not submitted any questions yet.
+          <a href="/add-question.html">Add one!</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user) {
+      buildNav('my');
+      loadMyQuestions();
+    }
+
+    async function loadMyQuestions() {
+      const spinner = document.getElementById('spinner');
+      const tableWrapper = document.getElementById('tableWrapper');
+      const emptyState = document.getElementById('emptyState');
+      const tbody = document.getElementById('myTableBody');
+
+      spinner.classList.add('show');
+
+      try {
+        const res = await fetch(`${BASE_URL}/questions/my?userId=${user.id}`);
+        const questions = await res.json();
+
+        spinner.classList.remove('show');
+
+        const total    = questions.length;
+        const approved = questions.filter(q => q.status === 'approved').length;
+        const pending  = questions.filter(q => q.status === 'pending').length;
+        const rejected = questions.filter(q => q.status === 'rejected').length;
+
+        document.getElementById('submissionCount').textContent =
+          `${total} total — ${approved} approved, ${pending} pending, ${rejected} rejected`;
+
+        if (total === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = questions.map((q, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td style="max-width:280px">
+              <div style="font-size:0.88rem;line-height:1.4">${escapeHtml(q.questionText)}</div>
+            </td>
+            <td>
+              <div style="font-size:0.88rem">${escapeHtml(q.subject)}</div>
+              <div style="font-size:0.78rem;color:var(--gray-500)">${escapeHtml(q.topic)}</div>
+            </td>
+            <td><span class="badge ${q.type === 'MCQ' ? 'badge-mcq' : 'badge-desc'}">${q.type}</span></td>
+            <td><span class="badge ${q.marks === 2 ? 'badge-2mark' : 'badge-8mark'}">${q.marks}M</span></td>
+            <td><span class="badge badge-${q.difficulty}">${q.difficulty}</span></td>
+            <td>
+              <span class="badge badge-${q.status}">${q.status}</span>
+            </td>
+            <td style="font-size:0.82rem">
+              ${q.approvedByName ? escapeHtml(q.approvedByName) : '<span style="color:var(--gray-500)">—</span>'}
+            </td>
+          </tr>
+        `).join('');
+
+        tableWrapper.style.display = 'block';
+
+      } catch (err) {
+        spinner.classList.remove('show');
+        document.getElementById('alertBox').className = 'alert show alert-error';
+        document.getElementById('alertBox').textContent = ' Could not connect to server.';
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '—';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

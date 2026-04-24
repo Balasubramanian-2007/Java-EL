@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pending Approvals — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav>
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Pending Approvals</h1>
+      <p>Review questions submitted by staff and approve or reject them.</p>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="card">
+
+      <div class="toolbar">
+        <span style="color:var(--gray-500);font-size:0.88rem" id="pendingCount">Loading...</span>
+      </div>
+
+      <div id="spinner" class="spinner show">Loading pending questions...</div>
+
+      <div class="table-wrapper" id="tableWrapper" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Subject / Topic</th>
+              <th>Type</th>
+              <th>Marks</th>
+              <th>Difficulty</th>
+              <th>Submitted By</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingTableBody"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" style="display:none;text-align:center;padding:3rem;color:var(--gray-500)">
+        <div style="font-size:3rem"></div>
+        <p style="margin-top:0.75rem">No pending questions. All caught up!</p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // This page is COE-only
+    const user = requireRole('coe');
+    if (user) {
+      buildNav('pending');
+      loadPending();
+    }
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+      setTimeout(() => box.classList.remove('show'), 4000);
+    }
+
+    async function loadPending() {
+      const spinner = document.getElementById('spinner');
+      const tableWrapper = document.getElementById('tableWrapper');
+      const emptyState = document.getElementById('emptyState');
+      const tbody = document.getElementById('pendingTableBody');
+
+      spinner.classList.add('show');
+      tableWrapper.style.display = 'none';
+      emptyState.style.display   = 'none';
+
+      try {
+        const res = await fetch(`${BASE_URL}/questions/pending`);
+        const questions = await res.json();
+
+        spinner.classList.remove('show');
+        document.getElementById('pendingCount').textContent =
+          `${questions.length} question(s) awaiting review`;
+
+        if (questions.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = questions.map((q, i) => `
+          <tr id="row-${q.id}">
+            <td>${i + 1}</td>
+            <td style="max-width:280px">
+              <div style="font-size:0.88rem;line-height:1.4">${escapeHtml(q.questionText)}</div>
+              ${q.type === 'MCQ' ? `
+                <div style="margin-top:0.35rem;font-size:0.76rem;color:var(--gray-500)">
+                  A: ${q.optionA||'—'} | B: ${q.optionB||'—'} |
+                  C: ${q.optionC||'—'} | D: ${q.optionD||'—'}
+                  <br/><strong>Correct: ${q.correctOption||'—'}</strong>
+                </div>` : ''}
+            </td>
+            <td>
+              <div style="font-size:0.88rem">${escapeHtml(q.subject)}</div>
+              <div style="font-size:0.78rem;color:var(--gray-500)">${escapeHtml(q.topic)}</div>
+            </td>
+            <td><span class="badge ${q.type === 'MCQ' ? 'badge-mcq' : 'badge-desc'}">${q.type}</span></td>
+            <td><span class="badge ${q.marks === 2 ? 'badge-2mark' : 'badge-8mark'}">${q.marks}M</span></td>
+            <td><span class="badge badge-${q.difficulty}">${q.difficulty}</span></td>
+            <td style="font-size:0.82rem">${escapeHtml(q.addedByName || '—')}</td>
+            <td>
+              <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
+                <button class="btn btn-success" onclick="updateStatus(${q.id}, 'approved')">
+                  ✓ Approve
+                </button>
+                <button class="btn btn-reject" onclick="updateStatus(${q.id}, 'rejected')">
+                  ✗ Reject
+                </button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+
+        tableWrapper.style.display = 'block';
+
+      } catch (err) {
+        spinner.classList.remove('show');
+        showAlert(' Could not connect to server.', false);
+      }
+    }
+
+    async function updateStatus(questionId, status) {
+      const label = status === 'approved' ? 'approve' : 'reject';
+      if (!confirm(`Are you sure you want to ${label} this question?`)) return;
+
+      try {
+        const res = await fetch(`${BASE_URL}/questions/${questionId}/approve`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: status, coeUserId: user.id })
+        });
+        const text = await res.text();
+
+        if (res.ok) {
+          showAlert(` Question ${status} successfully.`, true);
+          // Remove that row from the table instead of full reload
+          const row = document.getElementById('row-' + questionId);
+          if (row) row.remove();
+
+          // Update count
+          const remaining = document.querySelectorAll('#pendingTableBody tr').length;
+          document.getElementById('pendingCount').textContent =
+            `${remaining} question(s) awaiting review`;
+          if (remaining === 0) {
+            document.getElementById('tableWrapper').style.display = 'none';
+            document.getElementById('emptyState').style.display   = 'block';
+          }
+        } else {
+          showAlert(' ' + text, false);
+        }
+      } catch (err) {
+        showAlert(' Could not connect.', false);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '—';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

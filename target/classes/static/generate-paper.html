@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Generate Paper — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <nav></nav>
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Generate Question Paper</h1>
+      <p>Choose your preferences and generate a ready-to-print paper.</p>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="card" id="settingsCard">
+      <h2>Paper Settings</h2>
+
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label for="subject">Subject *</label>
+          <select id="subject">
+            <option value="">Loading subjects...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="difficulty">Difficulty Filter</label>
+          <select id="difficulty">
+            <option value="any">Any Difficulty</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="numShort">No. of 2-Mark Questions</label>
+          <input type="number" id="numShort" value="5" min="0" max="20"/>
+        </div>
+
+        <div class="form-group">
+          <label for="numLong">No. of 8-Mark Questions</label>
+          <input type="number" id="numLong" value="5" min="0" max="20"/>
+        </div>
+
+        <div class="form-group">
+          <label for="totalMarks">Total Marks (auto-calculated)</label>
+          <input type="number" id="totalMarks" readonly
+                 style="background:var(--gray-100);cursor:not-allowed"/>
+        </div>
+
+        <div class="form-group">
+          <label for="institution">Institution Name (optional)</label>
+          <input type="text" id="institution" placeholder="e.g. ABC College of Engineering"/>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.5rem">
+        <button class="btn btn-primary" onclick="generatePaper()">⚡ Generate Paper</button>
+      </div>
+    </div>
+
+    <!-- Generated paper output -->
+    <div id="paperSection" style="display:none">
+      <div class="toolbar">
+        <strong style="color:var(--navy)"> Paper Generated!</strong>
+        <div class="toolbar-right">
+          <button class="btn btn-outline" onclick="window.print()">🖨️ Print / Save as PDF</button>
+          <button class="btn btn-primary" onclick="generatePaper()"> Regenerate</button>
+        </div>
+      </div>
+
+      <div class="paper-output">
+        <div class="paper-header">
+          <div id="institutionName" style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.25rem"></div>
+          <h2 id="paperTitle">Question Paper</h2>
+          <div class="paper-meta">
+            <span id="paperSubject"></span>
+            <span id="paperMarks"></span>
+            <span id="paperDate"></span>
+          </div>
+        </div>
+
+        <div id="shortQuestionsSection" style="display:none">
+          <h3 style="font-family:var(--font-heading);color:var(--navy);margin-bottom:1rem;font-size:1rem;">
+            Part A — Short Answer Questions (2 Marks each)
+          </h3>
+          <div id="shortQuestionsList"></div>
+        </div>
+
+        <div id="longQuestionsSection" style="display:none;margin-top:1.5rem">
+          <h3 style="font-family:var(--font-heading);color:var(--navy);margin-bottom:1rem;font-size:1rem;">
+            Part B — Long Answer Questions (8 Marks each)
+          </h3>
+          <div id="longQuestionsList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user) {
+      buildNav('generate');
+      loadSubjects();
+    }
+
+    function updateTotalMarks() {
+      const s = parseInt(document.getElementById('numShort').value) || 0;
+      const l = parseInt(document.getElementById('numLong').value)  || 0;
+      document.getElementById('totalMarks').value = (s * 2) + (l * 8);
+    }
+    document.getElementById('numShort').addEventListener('input', updateTotalMarks);
+    document.getElementById('numLong').addEventListener('input', updateTotalMarks);
+    updateTotalMarks();
+
+    async function loadSubjects() {
+      try {
+        const res = await fetch(`${BASE_URL}/questions/subjects`);
+        const subjects = await res.json();
+        const select = document.getElementById('subject');
+        select.innerHTML = subjects.length
+          ? subjects.map(s => `<option value="${s}">${s}</option>`).join('')
+          : '<option value="">No subjects found</option>';
+      } catch (err) {
+        document.getElementById('subject').innerHTML = '<option value="">Could not load</option>';
+      }
+    }
+
+    function showAlert(msg, ok) {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = 'alert show ' + (ok ? 'alert-success' : 'alert-error');
+      setTimeout(() => box.classList.remove('show'), 5000);
+    }
+
+    function renderQuestion(q, number) {
+      const options = q.type === 'MCQ' ? `
+        <div class="q-options">
+          <div class="q-option"><b>A.</b> ${escapeHtml(q.optionA)}</div>
+          <div class="q-option"><b>B.</b> ${escapeHtml(q.optionB)}</div>
+          <div class="q-option"><b>C.</b> ${escapeHtml(q.optionC)}</div>
+          <div class="q-option"><b>D.</b> ${escapeHtml(q.optionD)}</div>
+        </div>` : '';
+      return `
+        <div class="question-item">
+          <div class="q-num">${number}</div>
+          <div class="q-content">
+            <div class="q-text">${escapeHtml(q.questionText)}</div>
+            ${options}
+            <div class="q-mark" style="margin-top:0.4rem">[${q.marks} Marks — ${q.difficulty}]</div>
+          </div>
+        </div>`;
+    }
+
+    async function generatePaper() {
+      const subject  = document.getElementById('subject').value;
+      const numShort = parseInt(document.getElementById('numShort').value) || 0;
+      const numLong  = parseInt(document.getElementById('numLong').value)  || 0;
+
+      if (!subject) { showAlert('⚠️ Please select a subject.', false); return; }
+      if (numShort + numLong === 0) { showAlert('⚠️ Enter at least 1 question count.', false); return; }
+
+      const body = {
+        subject,
+        totalMarks:        (numShort * 2) + (numLong * 8),
+        numShortQuestions: numShort,
+        numLongQuestions:  numLong,
+        difficulty:        document.getElementById('difficulty').value
+      };
+
+      try {
+        const res = await fetch(`${BASE_URL}/generate-paper`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          showAlert(' ' + await res.text(), false);
+          return;
+        }
+
+        const questions = await res.json();
+        const shortQs   = questions.filter(q => q.marks === 2);
+        const longQs    = questions.filter(q => q.marks === 8);
+
+        const institution = document.getElementById('institution').value.trim();
+        document.getElementById('institutionName').textContent = institution || '';
+        document.getElementById('paperTitle').textContent = `${subject} — Question Paper`;
+        document.getElementById('paperSubject').textContent = `Subject: ${subject}`;
+        document.getElementById('paperMarks').textContent =
+          `Total Marks: ${questions.reduce((s, q) => s + q.marks, 0)}`;
+        document.getElementById('paperDate').textContent =
+          `Date: ${new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})}`;
+
+        const shortSection = document.getElementById('shortQuestionsSection');
+        const shortList    = document.getElementById('shortQuestionsList');
+        if (shortQs.length > 0) {
+          shortList.innerHTML = shortQs.map((q, i) => renderQuestion(q, i + 1)).join('');
+          shortSection.style.display = 'block';
+        } else {
+          shortSection.style.display = 'none';
+        }
+
+        const longSection = document.getElementById('longQuestionsSection');
+        const longList    = document.getElementById('longQuestionsList');
+        if (longQs.length > 0) {
+          longList.innerHTML = longQs.map((q, i) => renderQuestion(q, shortQs.length + i + 1)).join('');
+          longSection.style.display = 'block';
+        } else {
+          longSection.style.display = 'none';
+        }
+
+        document.getElementById('paperSection').style.display = 'block';
+        document.getElementById('paperSection').scrollIntoView({ behavior: 'smooth' });
+
+      } catch (err) {
+        showAlert(' Could not connect to server.', false);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '—';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
