@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bulk Upload — QPGen</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    /* Drop zone */
+    .drop-zone {
+      border: 2.5px dashed var(--gray-200);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--gray-100);
+    }
+    .drop-zone:hover,
+    .drop-zone.dragging {
+      border-color: var(--amber);
+      background: #fffbeb;
+    }
+    .drop-zone .dz-icon  { font-size: 2.8rem; margin-bottom: 0.6rem; }
+    .drop-zone .dz-text  { font-size: 1rem; color: var(--navy); font-weight: 600; margin-bottom: 0.3rem; }
+    .drop-zone .dz-hint  { font-size: 0.83rem; color: var(--gray-500); }
+
+    /* File chosen state */
+    .file-chosen {
+      border-color: var(--amber);
+      background: #fffbeb;
+    }
+    .file-chosen .dz-icon::after { content: ' ✅'; }
+
+    /* Preview table */
+    #previewSection { display: none; }
+    #previewTable td, #previewTable th { font-size: 0.82rem; padding: 0.5rem 0.75rem; }
+    #previewTable th { font-size: 0.75rem; }
+
+    /* Result box */
+    #resultBox {
+      display: none;
+      white-space: pre-wrap;
+      padding: 1rem 1.25rem;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      margin-top: 1rem;
+    }
+    #resultBox.success { background: #c6f6d5; color: #22543d; }
+    #resultBox.error   { background: #fed7d7; color: #742a2a; }
+  </style>
+</head>
+<body>
+
+  <nav></nav>
+
+  <div class="page">
+
+    <div class="page-header">
+      <h1>Bulk Upload Questions</h1>
+      <p>Upload an Excel file (.xlsx) to add multiple questions at once.</p>
+    </div>
+
+    <!-- Role notice -->
+    <div id="roleBanner" class="info-banner"></div>
+
+    <!-- Step 1: Download template -->
+    <div class="card">
+      <h2>Step 1 — Download the Template</h2>
+      <p style="font-size:0.9rem;color:var(--gray-500);margin-bottom:1rem;">
+        Fill in the provided Excel template and upload it below. Make sure the column headers remain unchanged.
+      </p>
+      <a href="/templates/questions_template.xlsx" class="btn btn-outline" download>
+        ⬇️ Download Excel Template
+      </a>
+
+      <!-- Column guide -->
+      <div style="margin-top:1.5rem">
+        <p style="font-size:0.83rem;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.6rem;">
+          Required Columns
+        </p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Column</th><th>Values Allowed</th><th>Required?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>question_text</td><td>Any text</td><td>✅ Yes</td></tr>
+              <tr><td>subject</td><td>e.g. Mathematics, Physics</td><td>✅ Yes</td></tr>
+              <tr><td>topic</td><td>e.g. Calculus, Optics</td><td>✅ Yes</td></tr>
+              <tr><td>difficulty</td><td>easy / medium / hard</td><td>✅ Yes</td></tr>
+              <tr><td>marks</td><td>2 or 8</td><td>✅ Yes</td></tr>
+              <tr><td>type</td><td>MCQ or Descriptive</td><td>✅ Yes</td></tr>
+              <tr><td>option_a / option_b / option_c / option_d</td><td>Option text</td><td>Only for MCQ</td></tr>
+              <tr><td>correct_option</td><td>A / B / C / D</td><td>Only for MCQ</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Upload -->
+    <div class="card">
+      <h2>Step 2 — Upload Your File</h2>
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="dz-icon" id="dzIcon">📂</div>
+        <div class="dz-text" id="dzText">Click to choose or drag & drop your .xlsx file here</div>
+        <div class="dz-hint" id="dzHint">Only .xlsx files · Max 5 MB</div>
+      </div>
+
+      <!-- Hidden file input -->
+      <input type="file" id="fileInput" accept=".xlsx" style="display:none" onchange="handleFileSelect(event)"/>
+
+      <!-- Preview section (shown after file is chosen) -->
+      <div id="previewSection" style="margin-top:1.5rem">
+        <div class="toolbar">
+          <span style="font-weight:600;color:var(--navy)" id="previewTitle">Preview</span>
+          <div class="toolbar-right">
+            <button class="btn btn-outline" onclick="clearFile()">✕ Clear</button>
+            <button class="btn btn-primary" id="uploadBtn" onclick="uploadFile()">
+              ⬆️ Upload &amp; Save
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="previewTable">
+            <thead id="previewHead"></thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+        <p style="font-size:0.8rem;color:var(--gray-500);margin-top:0.5rem" id="previewNote"></p>
+      </div>
+
+      <!-- Result message after upload -->
+      <div id="resultBox"></div>
+    </div>
+
+  </div>
+
+  <footer>Question Paper Generator · Built with Spring Boot + PostgreSQL</footer>
+
+  <!--
+    SheetJS (xlsx library) — reads the Excel file in the browser so we can
+    preview it before uploading. This is a CDN import, no npm needed.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user) {
+      buildNav('bulk');
+
+      const banner = document.getElementById('roleBanner');
+      if (user.role === 'coe') {
+        banner.textContent = '✅ As COE, all uploaded questions will be automatically approved.';
+      } else {
+        banner.className = 'info-banner warn';
+        banner.textContent = '⏳ As Staff, uploaded questions will be sent to the COE for approval.';
+      }
+    }
+
+    let selectedFile = null;
+
+    // ---- Drag & Drop events ----
+    const dropZone = document.getElementById('dropZone');
+
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('dragging');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragging');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+
+    // ---- File input change ----
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) processFile(file);
+    }
+
+    // ---- Read file and show preview ----
+    function processFile(file) {
+      if (!file.name.endsWith('.xlsx')) {
+        alert('Please upload a .xlsx file only.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File is too large. Maximum size is 5 MB.');
+        return;
+      }
+
+      selectedFile = file;
+
+      // Update drop zone appearance
+      document.getElementById('dzIcon').textContent = '📊';
+      document.getElementById('dzText').textContent = file.name;
+      document.getElementById('dzHint').textContent =
+        `${(file.size / 1024).toFixed(1)} KB · Click to change`;
+      dropZone.classList.add('file-chosen');
+
+      // Read the file with SheetJS and render a preview
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data      = new Uint8Array(e.target.result);
+          const workbook  = XLSX.read(data, { type: 'array' });
+          const sheet     = workbook.Sheets[workbook.SheetNames[0]];
+          const rows      = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          renderPreview(rows);
+        } catch (err) {
+          alert('Could not read the file. Make sure it is a valid .xlsx file.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ---- Render preview table (max 6 rows shown) ----
+    function renderPreview(rows) {
+      if (rows.length < 2) {
+        alert('The file appears to be empty.');
+        return;
+      }
+
+      const headers  = rows[0];
+      const dataRows = rows.slice(1).filter(r => r.some(c => c !== ''));
+      const showRows = dataRows.slice(0, 5); // Preview first 5 data rows
+
+      // Header row
+      document.getElementById('previewHead').innerHTML =
+        '<tr>' + headers.map(h => `<th>${escapeHtml(String(h))}</th>`).join('') + '</tr>';
+
+      // Data rows
+      document.getElementById('previewBody').innerHTML = showRows.map(row =>
+        '<tr>' + headers.map((_, i) => `<td>${escapeHtml(String(row[i] ?? ''))}</td>`).join('') + '</tr>'
+      ).join('');
+
+      // Note
+      document.getElementById('previewTitle').textContent =
+        `Preview — ${dataRows.length} question(s) found`;
+      document.getElementById('previewNote').textContent =
+        dataRows.length > 5
+          ? `Showing first 5 of ${dataRows.length} rows. All ${dataRows.length} will be uploaded.`
+          : `All ${dataRows.length} row(s) shown.`;
+
+      document.getElementById('previewSection').style.display = 'block';
+      document.getElementById('resultBox').style.display = 'none';
+    }
+
+    // ---- Upload the file to the server ----
+    async function uploadFile() {
+      if (!selectedFile || !user) return;
+
+      const btn = document.getElementById('uploadBtn');
+      btn.textContent = '⏳ Uploading...';
+      btn.disabled    = true;
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const res = await fetch(
+          `${BASE_URL}/questions/bulk?userId=${user.id}&userRole=${user.role}`,
+          { method: 'POST', body: formData }
+        );
+        const text = await res.text();
+
+        const resultBox = document.getElementById('resultBox');
+        resultBox.textContent  = text;
+        resultBox.className    = res.ok ? 'success' : 'error';
+        resultBox.style.display = 'block';
+        resultBox.scrollIntoView({ behavior: 'smooth' });
+
+        if (res.ok) {
+          // Reset form on success
+          clearFile();
+        }
+      } catch (err) {
+        const resultBox = document.getElementById('resultBox');
+        resultBox.textContent   = '❌ Could not connect to server. Is Spring Boot running?';
+        resultBox.className     = 'error';
+        resultBox.style.display = 'block';
+      }
+
+      btn.textContent = '⬆️ Upload & Save';
+      btn.disabled    = false;
+    }
+
+    // ---- Reset the file picker ----
+    function clearFile() {
+      selectedFile = null;
+      document.getElementById('fileInput').value         = '';
+      document.getElementById('dzIcon').textContent      = '📂';
+      document.getElementById('dzText').textContent      = 'Click to choose or drag & drop your .xlsx file here';
+      document.getElementById('dzHint').textContent      = 'Only .xlsx files · Max 5 MB';
+      dropZone.classList.remove('file-chosen', 'dragging');
+      document.getElementById('previewSection').style.display = 'none';
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

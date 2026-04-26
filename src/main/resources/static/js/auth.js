@@ -52,6 +52,7 @@ function buildNav(activePage) {
         { href: '/add-question.html',    label: 'Add Question', id: 'add' },
         { href: '/view-questions.html',  label: 'Questions',    id: 'view' },
         { href: '/generate-paper.html',  label: 'Generate',     id: 'generate' },
+        { href: '/bulk-upload.html', label: ' Bulk Upload', id: 'bulk' },
     ];
 
     // Only COE sees the Pending Approvals page

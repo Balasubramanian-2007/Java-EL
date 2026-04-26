@@ -6,7 +6,7 @@ public class User {
     private String name;
     private String email;
     private String passwordHash;
-    private String role;          // "staff" or "coe"
+    private String role;          
 
     public User() {}
 

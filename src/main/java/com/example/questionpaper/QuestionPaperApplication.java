@@ -8,6 +8,6 @@ public class QuestionPaperApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(QuestionPaperApplication.class, args);
-        System.out.println("\n✅ QPGen Server running at http://localhost:8080\n");
+        System.out.println("\n QPGen Server running at http://localhost:8080\n");
     }
 }
